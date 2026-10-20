@@ -212,7 +212,6 @@
     </div>
 
 <script>
-    // Configuration: Pointing directly to your Hostinger VPS via Nginx
     const API_URL = "https://api.wirewavesolutions.io/upload";
 
     let selectedFile = null;
@@ -279,8 +278,6 @@
             const response = await fetch(API_URL, {
                 method: 'POST',
                 body: formData
-                // Note: Do not set Content-Type header manually when sending FormData; 
-                // the browser automatically attaches 'multipart/form-data' with the boundary string.
             });
 
             if (!response.ok) {
