@@ -211,88 +211,91 @@
         </div>
     </div>
 
-    <script>
-        // CONFIGURATION: Replace with your Cloud Run Service URL
-        const CLOUD_RUN_URL = "https://gcs-signed-url-245053659616.europe-west2.run.app";
+<script>
+    // Configuration: Pointing directly to your Hostinger VPS via Nginx
+    const API_URL = "https://api.wirewavesolutions.io/upload";
 
-        let selectedFile = null;
+    let selectedFile = null;
 
-        // Drag and drop handlers
-        const dropArea = document.getElementById('dropArea');
+    // Drag and drop handlers
+    const dropArea = document.getElementById('dropArea');
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropArea.classList.add('dragover');
-            }, false);
-        });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        }, false);
+    });
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropArea.classList.remove('dragover');
-            }, false);
-        });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+        }, false);
+    });
 
-        dropArea.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length) {
-                selectedFile = files[0];
-                updateUIWithFile();
+    dropArea.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            selectedFile = files[0];
+            updateUIWithFile();
+        }
+    });
+
+    function handleFileSelect(event) {
+        if (event.target.files.length) {
+            selectedFile = event.target.files[0];
+            updateUIWithFile();
+        }
+    }
+
+    function updateUIWithFile() {
+        if (!selectedFile) return;
+        document.getElementById('fileName').innerText = selectedFile.name;
+        document.getElementById('uploadBtn').disabled = false;
+        setStatus(`Selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`, '');
+    }
+
+    function setStatus(text, type) {
+        const box = document.getElementById('statusBox');
+        box.innerText = text;
+        box.className = `status-box ${type}`;
+    }
+
+    async function uploadFile() {
+        if (!selectedFile) return;
+
+        const btn = document.getElementById('uploadBtn');
+        btn.disabled = true;
+
+        try {
+            setStatus("Uploading file to pipeline...", "active");
+
+            // Build standard multipart form payload
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
+            // Single POST request directly to FastAPI (which streams it straight to GCS)
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                body: formData
+                // Note: Do not set Content-Type header manually when sending FormData; 
+                // the browser automatically attaches 'multipart/form-data' with the boundary string.
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Upload failed with status ${response.status}`);
             }
-        });
 
-        function handleFileSelect(event) {
-            if (event.target.files.length) {
-                selectedFile = event.target.files[0];
-                updateUIWithFile();
-            }
+            const result = await response.json();
+            setStatus("✅ Success! File Successfully Processed.", "success");
+
+        } catch (err) {
+            setStatus(`❌ Error: ${err.message}`, "error");
+            btn.disabled = false;
         }
-
-        function updateUIWithFile() {
-            if (!selectedFile) return;
-            document.getElementById('fileName').innerText = selectedFile.name;
-            document.getElementById('uploadBtn').disabled = false;
-            setStatus(`Selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`, '');
-        }
-
-        function setStatus(text, type) {
-            const box = document.getElementById('statusBox');
-            box.innerText = text;
-            box.className = `status-box ${type}`;
-        }
-
-        async function uploadFile() {
-            if (!selectedFile) return;
-
-            const btn = document.getElementById('uploadBtn');
-            btn.disabled = true;
-
-            try {
-                // Step 1: Get GCS Signed URL from Cloud Run Ingestion Service
-                setStatus("1/3 Requesting GCS Signed URL...", "active");
-                const urlResponse = await fetch(`${CLOUD_RUN_URL}/?filename=${encodeURIComponent(selectedFile.name)}`);
-                
-                if (!urlResponse.ok) throw new Error("Failed to retrieve signed upload URL.");
-                const { signedUrl, batchId } = await urlResponse.json();
-
-                // Step 2: Direct HTTP PUT from browser straight to Google Cloud Storage
-                setStatus("2/3 Uploading batch directly to Cloud Storage...", "active");
-                const uploadResponse = await fetch(signedUrl, {
-                    method: 'PUT',
-                    body: selectedFile,
-                    headers: { 'Content-Type': 'text/csv' }
-                });
-
-                if (!uploadResponse.ok) throw new Error("GCS direct upload failed.");
-
-                setStatus("✅ Success! File Successfully Processed.", "success");
-
-            } catch (err) {
-                setStatus(`❌ Error: ${err.message}`, "error");
-                btn.disabled = false;
-            }
-        }
-    </script>
+    }
+</script>
 </body>
 </html>
