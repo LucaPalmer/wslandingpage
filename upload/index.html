@@ -271,7 +271,7 @@
             try {
                 // Step 1: Get GCS Signed URL from Cloud Run Ingestion Service
                 setStatus("1/3 Requesting GCS Signed URL...", "active");
-                const urlResponse = await fetch(`${CLOUD_RUN_URL}/get-signed-url?filename=${encodeURIComponent(selectedFile.name)}`);
+                const urlResponse = await fetch(`${CLOUD_RUN_URL}/?filename=${encodeURIComponent(selectedFile.name)}`);
                 
                 if (!urlResponse.ok) throw new Error("Failed to retrieve signed upload URL.");
                 const { signedUrl, batchId } = await urlResponse.json();
@@ -286,17 +286,7 @@
 
                 if (!uploadResponse.ok) throw new Error("GCS direct upload failed.");
 
-                // Step 3: Trigger BigQuery Stored Procedure Orchestration (Dev -> Gold)
-                setStatus("3/3 Triggering BigQuery Pipeline (Dev -> Gold)...", "active");
-                const pipelineResponse = await fetch(`${CLOUD_RUN_URL}/run-pipeline`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ batch_id: batchId })
-                });
-
-                if (!pipelineResponse.ok) throw new Error("BigQuery pipeline execution failed.");
-
-                setStatus("✅ Success! Batch processed into Gold dataset.", "success");
+                setStatus("✅ Success! File Successfully Processed.", "success");
 
             } catch (err) {
                 setStatus(`❌ Error: ${err.message}`, "error");
