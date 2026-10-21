@@ -65,7 +65,7 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             width: 100%;
-            max-width: 460px;
+            max-width: 440px;
             border-radius: 24px;
             border: 1px solid rgba(88, 166, 255, 0.15);
             padding: 45px 35px;
@@ -163,11 +163,10 @@
             color: #8b949e;
             font-size: 0.85rem;
             text-align: left;
-            min-height: 52px;
+            min-height: 48px;
             display: flex;
             align-items: center;
             word-break: break-word;
-            line-height: 1.4;
         }
 
         .status-box.active {
@@ -184,30 +183,13 @@
             color: #f85149;
             border-color: rgba(248, 81, 73, 0.3);
         }
-
-        .spinner {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(88, 166, 255, 0.2);
-            border-top-color: #58a6ff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-            flex-shrink: 0;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h1 class="brand-name">Upload Files</h1>
-        <p class="tagline">Using our provided template, please drag the CSV file to submit your address batch.</p>
-        
+        <p class="tagline">Using our provided template, please drag the CSV file to submit your file.</p>
         <!-- File Drop Target -->
         <div class="upload-area" id="dropArea" onclick="document.getElementById('fileInput').click()">
             <span class="upload-icon">📄</span>
@@ -217,8 +199,8 @@
         </div>
 
         <button class="btn-action" id="uploadBtn" onclick="uploadFile()" disabled>
-            <span id="btnText">Submit File</span>
-            <span id="btnIcon">⚡</span>
+            <span>Submit File</span>
+            <span>⚡</span>
         </button>
 
         <div class="divider"></div>
@@ -230,8 +212,7 @@
     </div>
 
 <script>
-    // Configuration Endpoint
-    const API_BASE_URL = "https://api.wirewavesolutions.io";
+    const API_URL = "https://api.wirewavesolutions.io/upload";
 
     let selectedFile = null;
 
@@ -269,104 +250,47 @@
 
     function updateUIWithFile() {
         if (!selectedFile) return;
-        
-        // Ensure CSV extension
-        if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
-            setStatus("Please select a valid .csv file.", "error");
-            document.getElementById('uploadBtn').disabled = true;
-            return;
-        }
-
         document.getElementById('fileName').innerText = selectedFile.name;
         document.getElementById('uploadBtn').disabled = false;
         setStatus(`Selected: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`, '');
     }
 
-    function setStatus(text, type, showSpinner = false) {
+    function setStatus(text, type) {
         const box = document.getElementById('statusBox');
-        if (showSpinner) {
-            box.innerHTML = `<div class="spinner"></div><span>${text}</span>`;
-        } else {
-            box.innerText = text;
-        }
+        box.innerText = text;
         box.className = `status-box ${type}`;
     }
 
-    function setBtnLoading(isLoading) {
+    async function uploadFile() {
+        if (!selectedFile) return;
+
         const btn = document.getElementById('uploadBtn');
-        const btnText = document.getElementById('btnText');
-        const btnIcon = document.getElementById('btnIcon');
-
-        if (isLoading) {
-            btn.disabled = true;
-            btnText.innerText = "Uploading...";
-            btnIcon.innerText = "⏳";
-        } else {
-            btn.disabled = !selectedFile;
-            btnText.innerText = "Submit File";
-            btnIcon.innerText = "⚡";
-        }
-    }
-
-    async function uploadFile(fileInput) { const file = fileInput.files[0]; {
-        if (!selectedFile) {
-            setStatus("No file selected.", "error");
-            return;
-        }
-
-        setBtnLoading(true);
+        btn.disabled = true;
 
         try {
-            // 1. Determine Content-Type (Browsers often leave CSV file.type empty)
-            const contentType = selectedFile.type || "text/csv";
+            setStatus("Uploading file to pipeline...", "active");
 
-            setStatus("Step 1/2: Requesting GCS upload authorization...", "active", true);
+            // Build standard multipart form payload
+            const formData = new FormData();
+            formData.append("file", selectedFile);
 
-            // 2. Get GCS Signed URL from FastAPI Backend
-            const urlEndpoint = `${API_BASE_URL}/generate-upload-url?filename=${encodeURIComponent(selectedFile.name)}&content_type=${encodeURIComponent(contentType)}`;
-            
-            const authResponse = await fetch(urlEndpoint, {
-                method: "GET",
-                headers: {
-                    "Accept": "application/json"
-                }
+            // Single POST request directly to FastAPI (which streams it straight to GCS)
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                body: formData
             });
 
-            if (!authResponse.ok) {
-                const errorText = await authResponse.text();
-                throw new Error(`Backend auth failed (${authResponse.status}): ${errorText || authResponse.statusText}`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Upload failed with status ${response.status}`);
             }
 
-            const { upload_url } = await authResponse.json();
-
-            if (!upload_url) {
-                throw new Error("Backend response did not contain a valid upload_url.");
-            }
-
-            setStatus("Step 2/2: Uploading file directly to Google Cloud Storage...", "active", true);
-
-            // 3. Perform Direct PUT Stream to GCS Signed URL
-            const gcsResponse = await fetch(upload_url, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": contentType
-                },
-                body: selectedFile // Raw stream, no FormData wrapper
-            });
-
-            if (gcsResponse.ok) {
-                setStatus(`Success! "${selectedFile.name}" was uploaded directly to GCS.`, "success");
-                console.log("GCS direct upload complete.");
-            } else {
-                const gcsError = await gcsResponse.text();
-                throw new Error(`GCS Direct Upload Failed (${gcsResponse.status}): ${gcsError || gcsResponse.statusText}`);
-            }
+            const result = await response.json();
+            setStatus("✅ Success! File Successfully Processed.", "success");
 
         } catch (err) {
-            console.error("Upload error:", err);
-            setStatus(`Error: ${err.message}`, "error");
-        } finally {
-            setBtnLoading(false);
+            setStatus(`❌ Error: ${err.message}`, "error");
+            btn.disabled = false;
         }
     }
 </script>
