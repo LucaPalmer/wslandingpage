@@ -198,6 +198,11 @@
             <input type="file" id="fileInput" accept=".csv" onchange="handleFileSelect(event)">
         </div>
 
+        <div class="input-group">
+            <label class="input-label" for="accessKey">Access Key / Password</label>
+            <input type="password" id="accessKey" class="input-password" placeholder="Enter authorization key">
+        </div>
+
         <button class="btn-action" id="uploadBtn" onclick="uploadFile()" disabled>
             <span>Submit File</span>
             <span>⚡</span>
@@ -261,20 +266,28 @@
         box.className = `status-box ${type}`;
     }
 
-    async function uploadFile() {
+    
+
+   async function uploadFile() {
         if (!selectedFile) return;
+
+        const passwordInput = document.getElementById('accessKey').value.trim();
+        if (!passwordInput) {
+            setStatus("❌ Please enter your access password.", "error");
+            return;
+        }
 
         const btn = document.getElementById('uploadBtn');
         btn.disabled = true;
 
         try {
-            setStatus("Uploading file to pipeline...", "active");
+            setStatus("Authenticating and uploading file...", "active");
 
-            // Build standard multipart form payload
+            // Build multipart form payload with both file and password
             const formData = new FormData();
             formData.append("file", selectedFile);
+            formData.append("password", passwordInput);
 
-            // Single POST request directly to FastAPI (which streams it straight to GCS)
             const response = await fetch(API_URL, {
                 method: 'POST',
                 body: formData
