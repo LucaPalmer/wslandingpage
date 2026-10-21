@@ -308,7 +308,7 @@
         }
     }
 
-    async function uploadFile() {
+    async function uploadFile(fileInput) { const file = fileInput.files[0]; {
         if (!selectedFile) {
             setStatus("No file selected.", "error");
             return;
