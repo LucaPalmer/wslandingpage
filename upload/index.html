@@ -169,6 +169,11 @@
             word-break: break-word;
         }
 
+        .input-group{
+            color: #58a6ff;
+            border-color: rgba(88, 166, 255, 0.3);  
+        }
+
         .status-box.active {
             color: #58a6ff;
             border-color: rgba(88, 166, 255, 0.3);
@@ -198,17 +203,17 @@
             <input type="file" id="fileInput" accept=".csv" onchange="handleFileSelect(event)">
         </div>
 
-        <div class="input-group">
-            <label class="input-label" for="accessKey">Access Key / Password</label>
-            <input type="password" id="accessKey" class="input-password" placeholder="Enter authorization key">
-        </div>
-
         <button class="btn-action" id="uploadBtn" onclick="uploadFile()" disabled>
             <span>Submit File</span>
             <span>⚡</span>
         </button>
 
         <div class="divider"></div>
+        
+        <div class="input-group">
+            <label class="input-label" for="accessKey">Access Key / Password</label>
+            <input type="password" id="accessKey" class="input-password" placeholder="Enter authorization key">
+        </div>
 
         <!-- Real-time Step Feedback -->
         <div class="status-box" id="statusBox">
