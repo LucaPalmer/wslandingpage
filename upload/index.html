@@ -261,38 +261,31 @@
         box.className = `status-box ${type}`;
     }
 
-    async function uploadFile() {
-        if (!selectedFile) return;
+   async function uploadFile(fileInput) {
+  const file = fileInput.files[0];
+  if (!file) return;
 
-        const btn = document.getElementById('uploadBtn');
-        btn.disabled = true;
+  // 1. Get Signed URL from FastAPI backend
+  const res = await fetch(
+    `https://api.wirewavesolutions.io/generate-upload-url?filename=${encodeURIComponent(file.name)}&content_type=${encodeURIComponent(file.type)}`
+  );
+  const { upload_url } = await res.json();
 
-        try {
-            setStatus("Uploading file to pipeline...", "active");
+  // 2. Upload raw file directly to Google Cloud Storage
+  const uploadRes = await fetch(upload_url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type, // Must match the content_type passed to generate_signed_url
+    },
+    body: file, // Send raw File object, DO NOT wrap in FormData
+  });
 
-            // Build standard multipart form payload
-            const formData = new FormData();
-            formData.append("file", selectedFile);
-
-            // Single POST request directly to FastAPI (which streams it straight to GCS)
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Upload failed with status ${response.status}`);
-            }
-
-            const result = await response.json();
-            setStatus("✅ Success! File Successfully Processed.", "success");
-
-        } catch (err) {
-            setStatus(`❌ Error: ${err.message}`, "error");
-            btn.disabled = false;
-        }
-    }
+  if (uploadRes.ok) {
+    console.log("File uploaded directly to GCS successfully!");
+  } else {
+    console.error("Direct GCS upload failed", uploadRes.status);
+  }
+}
 </script>
 </body>
 </html>
